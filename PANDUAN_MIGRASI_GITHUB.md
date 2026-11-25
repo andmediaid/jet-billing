@@ -5,6 +5,15 @@ ke repo pribadi **`https://github.com/andmediaid/jet-billing`** dengan riwayat b
 (fresh start), lalu **menghapus semua akses GitHub milik alijaya** dari komputer ini,
 serta cara install dan update di VPS.
 
+> **STATUS MIGRASI: SELESAI (dijalankan otomatis)**
+> - Repo baru: `https://github.com/andmediaid/jet-billing` — **PUBLIC**, 1 commit awal `6d12e79`, **408 file**.
+> - File sensitif (`settings.json`, `database/`, APK/AAB, WireGuard private key, `.env`) **tidak ikut** — sudah diverifikasi.
+> - History lama (678 commit, termasuk 9 commit terbaru `dd8b0d1`) tersimpan **lokal** di
+>   `C:\BILLING\_arsip-git-alijayanet-20261125-122404` — tidak ikut ke GitHub.
+> - Kredensial GitHub di komputer ini hanya milik **andmediaid** (tidak ada lagi milik alijaya).
+> - Sisa tindakan manual di web GitHub: bagian **D.4–D.7** (revoke PAT alijaya, hapus/private repo lama, sign out VS Code).
+> - Di VPS: ikuti bagian **F** (install/clone dari repo baru), lalu **G** untuk alur update.
+
 Dokumen ini dipakai bersama script:
 
 | File | Fungsi |
