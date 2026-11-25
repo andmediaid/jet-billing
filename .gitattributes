@@ -1,0 +1,37 @@
+# Normalisasi line ending agar aman dipakai di Windows dan Linux/VPS
+* text=auto
+
+# Script shell WAJIB LF, kalau CRLF akan error di VPS ($'\r': command not found)
+*.sh   text eol=lf
+*.bash text eol=lf
+
+# Script Windows
+*.ps1  text eol=crlf
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Kode & data teks
+*.js   text eol=lf
+*.mjs  text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.ejs  text eol=lf
+*.css  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.txt  text eol=lf
+
+# File biner: jangan diubah git
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.xlsx binary
+*.apk  binary
+*.aab  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary

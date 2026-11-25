@@ -1,0 +1,8 @@
+MY_WEBHOOK_SECRET=Qris-Statik-key
+
+# Sumber update aplikasi (repo resmi Jet Billing by Andmedia)
+GITHUB_REPO_URL=https://github.com/andmediaid/jet-billing.git
+GITHUB_BRANCH=main
+# Token untuk repo PRIVAT (Personal Access Token). Kosongkan jika repo publik.
+# JANGAN commit file .env ke GitHub.
+GITHUB_TOKEN=

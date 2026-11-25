@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="<%= lang || 'id' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bandwidth Realtime | <%= company %></title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<%- include('partials/sidebar', { activePage: 'bandwidth', company }) %>
+<div class="mw">
+  <div class="topbar">
+    <div class="tb-title">
+      <button class="hb-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <i class="bi bi-graph-up-arrow"></i> Bandwidth Realtime
+    </div>
+    <div class="tb-right">
+      <span class="live-dot"></span>
+      <a href="/admin" class="btn btn-g btn-sm"><i class="bi bi-arrow-left"></i> Dashboard</a>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="card" style="background:rgba(30,41,59,.55);border:1px solid var(--border);border-radius:16px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <div style="font-weight:800"><i class="bi bi-activity" style="color:#22d3ee"></i> Grafik Pemakaian (Realtime, per 3 detik)</div>
+        <div id="bw-status" style="font-size:12px;color:var(--muted)">Memuat…</div>
+      </div>
+      <div style="padding:16px;position:relative;height:300px"><canvas id="bwCanvas"></canvas></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-hd"><h6 style="margin:0"><i class="bi bi-hdd-network"></i> Per Server / Wilayah</h6></div>
+      <div class="card-bd">
+        <div class="tbl-wrap">
+          <table class="dtbl">
+            <thead><tr><th>Server</th><th>Status</th><th>Download</th><th>Upload</th><th>Pelanggan Online</th></tr></thead>
+            <tbody id="bw-server-rows">
+              <tr><td colspan="5" class="hint">Memuat…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var chart=null,labels=[],dl=[],ul=[],MAXP=60;
+  function fmt(n){ n=Number(n)||0; return n>=1000 ? (n/1000).toFixed(2)+' Gbps' : n.toFixed(1)+' Mbps'; }
+  function init(){
+    if(chart||typeof Chart==='undefined') return;
+    var c=document.getElementById('bwCanvas'); if(!c) return;
+    chart=new Chart(c,{type:'line',data:{labels:labels,datasets:[
+      {label:'Download',data:dl,borderColor:'#22d3ee',backgroundColor:'rgba(34,211,238,.12)',borderWidth:2,tension:.35,fill:true,pointRadius:0},
+      {label:'Upload',data:ul,borderColor:'#c084fc',backgroundColor:'rgba(192,132,252,.12)',borderWidth:2,tension:.35,fill:true,pointRadius:0}
+    ]},options:{responsive:true,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{labels:{color:'#cbd5e1',boxWidth:12}}},
+      scales:{x:{display:false},y:{beginAtZero:true,ticks:{color:'#94a3b8',callback:function(v){return v+' Mbps';}},grid:{color:'rgba(148,163,184,.12)'}}}}});
+  }
+  async function poll(){
+    try{
+      var r=await fetch('/admin/api/bandwidth',{headers:{'Accept':'application/json'}});
+      var d=await r.json(); init();
+      var ts=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+      document.getElementById('bw-status').textContent='Total DL '+fmt(d.totalRxMbps)+' · UL '+fmt(d.totalTxMbps)+' · '+d.onlineCount+' online · '+ts;
+      var rows=(d.servers||[]).map(function(s){
+        return '<tr><td style="font-weight:700">'+s.name+'</td><td>'+(s.online?'<span style="color:#4ade80">Online</span>':'<span style="color:#f87171">Offline</span>')+'</td><td>'+fmt(s.rxMbps)+'</td><td>'+fmt(s.txMbps)+'</td><td>'+(s.onlineCount||0)+'</td></tr>';
+      }).join('');
+      document.getElementById('bw-server-rows').innerHTML=rows||'<tr><td colspan="5" class="hint">Belum ada server terdaftar.</td></tr>';
+      if(chart){labels.push(ts);dl.push(d.totalRxMbps||0);ul.push(d.totalTxMbps||0);if(labels.length>MAXP){labels.shift();dl.shift();ul.shift();}chart.update('none');}
+    }catch(e){document.getElementById('bw-status').textContent='⚠ Gagal memuat (server offline?)';}
+  }
+  document.addEventListener('DOMContentLoaded',function(){init();poll();setInterval(poll,3000);});
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="<%= (typeof lang !== 'undefined' && lang) ? lang : 'id' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Cuaca Buruk BMKG | <%= company %></title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .cw-card { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:16px; margin-bottom:16px; }
+    .cw-bad { border-color: rgba(248,81,73,.5); }
+    .cw-safe { border-color: rgba(63,185,80,.35); }
+    .cw-pill { display:inline-flex; align-items:center; gap:6px; padding:4px 11px; border-radius:20px; font-size:11px; font-weight:800; }
+    .cw-pill.bad { background:rgba(248,81,73,.16); color:#f85149; }
+    .cw-pill.safe { background:rgba(63,185,80,.16); color:#3fb950; }
+    .cw-pill.off { background:rgba(139,148,158,.16); color:var(--muted); }
+    .cw-fc { display:flex; gap:8px; overflow-x:auto; padding:6px 0; }
+    .cw-slot { min-width:76px; text-align:center; background:rgba(15,23,42,.5); border:1px solid var(--border); border-radius:10px; padding:6px; font-size:11px; }
+    .cw-slot.bad { border-color:rgba(248,81,73,.6); background:rgba(248,81,73,.1); }
+    .cw-slot img { width:34px; height:34px; }
+    .cw-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+    .cw-note { font-size:11px; color:var(--muted); }
+  </style>
+</head>
+<body>
+<%- include('partials/sidebar', { activePage: 'cuaca_alert', company }) %>
+<div class="mw">
+  <div class="topbar">
+    <div class="tb-title">
+      <button class="hb-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <i class="bi bi-cloud-lightning-rain"></i> Cuaca Buruk BMKG (per Desa)
+    </div>
+    <div class="tb-right">
+      <a href="/admin/cuaca-alert" class="btn btn-g btn-sm"><i class="bi bi-arrow-clockwise"></i> Refresh</a>
+      <a href="/admin/logout" class="btn btn-g btn-sm"><i class="bi bi-box-arrow-left"></i></a>
+    </div>
+  </div>
+  <div class="page">
+
+    <% if (typeof msg !== 'undefined' && msg) { %>
+    <div class="alert alert-<%= msg.type === 'success' ? 's' : (msg.type === 'warning' ? 'w' : 'd') %>">
+      <i class="bi bi-<%= msg.type === 'success' ? 'check-circle' : 'exclamation-circle' %>"></i> <%= msg.text %>
+    </div>
+    <% } %>
+
+    <div class="alert alert-i">
+      <i class="bi bi-info-circle"></i>
+      Sistem cek prakiraan cuaca <b>BMKG per desa</b> (kode adm4 tiap server) setiap <b>3 jam</b>. Jika terdeteksi
+      <b>hujan lebat / petir / badai / angin kencang</b> atau kode BMKG <b>60, 61, 63, 95, 97</b>, notifikasi WhatsApp
+      otomatis dikirim hanya ke <b>pelanggan aktif di desa/server itu</b>. Anti-spam: jeda minimal <b>6 jam</b> untuk cuaca sama.
+    </div>
+
+    <div class="alert alert-<%= wa.connected ? 's' : 'w' %>">
+      <i class="bi bi-whatsapp"></i>
+      Status WA Gateway (<%= wa.gateway %>):
+      <b><%= wa.connected ? 'TERKONEKSI' : 'BELUM TERKONEKSI - silahkan pairing dulu di menu WhatsApp' %></b>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h6><i class="bi bi-hdd-network"></i> Daftar Server / Desa (<%= servers.length %>)</h6></div>
+      <div class="card-bd">
+        <% if (!servers.length) { %>
+          <div class="text-center text-muted" style="padding:24px">Belum ada server (MikroTik). Tambahkan dulu di menu <a href="/admin/routers">Router</a>.</div>
+        <% } %>
+        <% servers.forEach((s) => { %>
+          <%
+            const hasAdm4 = !!s.kode_bmkg_adm4;
+            const bad = s.weather && s.weather.bad;
+            const cls = bad ? 'cw-bad' : (s.cuaca_alert_enabled ? 'cw-safe' : '');
+          %>
+          <div class="cw-card <%= cls %>">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+              <div>
+                <div style="font-weight:800;font-size:15px"><i class="bi bi-router"></i> <%= s.name %></div>
+                <div class="cw-note">
+                  <i class="bi bi-geo-alt"></i> <%= s.nama_desa || 'Desa belum diisi' %><% if (s.kecamatan) { %>, <%= s.kecamatan %><% } %>
+                  &bull; adm4: <b><%= s.kode_bmkg_adm4 || 'belum diisi' %></b>
+                  <% if (s.weather && s.weather.lokasi && s.weather.lokasi.desa) { %> &bull; BMKG: <%= s.weather.lokasi.desa %><% } %>
+                </div>
+              </div>
+              <div style="text-align:right">
+                <% if (!hasAdm4) { %>
+                  <span class="cw-pill off"><i class="bi bi-cloud-slash"></i> Kode BMKG belum diisi</span>
+                <% } else if (bad) { %>
+                  <span class="cw-pill bad"><i class="bi bi-cloud-lightning-rain"></i> CUACA BURUK: <%= bad.desc %> (<%= bad.jam1 %>-<%= bad.jam2 %>)</span>
+                <% } else if (s.error) { %>
+                  <span class="cw-pill off"><i class="bi bi-exclamation-triangle"></i> Gagal ambil BMKG</span>
+                <% } else { %>
+                  <span class="cw-pill safe"><i class="bi bi-check-circle"></i> Aman</span>
+                <% } %>
+                <div style="margin-top:6px">
+                  <span class="cw-pill <%= s.cuaca_alert_enabled ? 'safe' : 'off' %>"><i class="bi bi-bell"></i> Alert <%= s.cuaca_alert_enabled ? 'ON' : 'OFF' %></span>
+                </div>
+              </div>
+            </div>
+
+            <% if (hasAdm4 && s.weather && s.weather.today && s.weather.today.length) { %>
+              <div class="cw-fc">
+                <% s.weather.today.forEach((f) => { %>
+                  <div class="cw-slot <%= (f.code===60||f.code===61||f.code===63||f.code===95||f.code===97) ? 'bad' : '' %>">
+                    <div style="font-weight:700"><%= f.time %></div>
+                    <% if (f.icon) { %><img src="<%= f.icon %>" alt=""><% } %>
+                    <div><%= f.desc %></div>
+                  </div>
+                <% }) %>
+              </div>
+            <% } %>
+            <% if (s.error) { %><div class="cw-note" style="color:var(--danger)">Error BMKG: <%= s.error %></div><% } %>
+
+            <div class="cw-actions">
+              <form method="POST" action="/admin/cuaca-alert/<%= s.id %>/toggle" style="display:inline">
+                <button class="btn <%= s.cuaca_alert_enabled ? 'btn-d' : 'btn-s' %> btn-sm" type="submit">
+                  <i class="bi bi-<%= s.cuaca_alert_enabled ? 'toggle-on' : 'toggle-off' %>"></i> <%= s.cuaca_alert_enabled ? 'Matikan Alert' : 'Aktifkan Alert' %>
+                </button>
+              </form>
+              <form method="POST" action="/admin/cuaca-alert/<%= s.id %>/run" style="display:inline" onsubmit="return confirm('Kirim notifikasi cuaca sekarang ke semua pelanggan aktif server ini?')">
+                <button class="btn btn-p btn-sm" type="submit"><i class="bi bi-send"></i> Kirim Sekarang</button>
+              </form>
+              <form method="POST" action="/admin/cuaca-alert/<%= s.id %>/test" style="display:inline-flex;gap:6px;align-items:center">
+                <input class="fc" name="phone" placeholder="08xxxx (nomor test)" style="width:170px;padding:6px 10px" required>
+                <button class="btn btn-g btn-sm" type="submit"><i class="bi bi-whatsapp"></i> Test Kirim</button>
+              </form>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+
+    <div class="card">
+      <div class="card-hd"><h6><i class="bi bi-clock-history"></i> Log Pengiriman Terakhir</h6></div>
+      <div class="tbl-wrap">
+        <table class="dtbl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Waktu</th>
+              <th>Server / Desa</th>
+              <th>Cuaca</th>
+              <th>Periode</th>
+              <th>Terikirim</th>
+              <th>Gagal</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+          <% if (!logs || !logs.length) { %>
+            <tr><td colspan="8" class="text-center text-muted" style="padding:24px">Belum ada log pengiriman.</td></tr>
+          <% } %>
+          <% (logs || []).forEach((l, i) => { %>
+            <tr>
+              <td class="text-muted"><%= i + 1 %></td>
+              <td class="cw-note"><%= l.created_at || '-' %></td>
+              <td><%= l.nama_server || '-' %><div class="cw-note"><%= l.nama_desa || '' %></div></td>
+              <td><%= l.cuaca || '-' %></td>
+              <td class="cw-note"><%= l.periode || '-' %></td>
+              <td><b><%= l.sent_count %></b> / <%= l.total_target %></td>
+              <td><%= l.failed_count %></td>
+              <td>
+                <% if (l.status === 'sent') { %><span class="cw-pill safe">sent</span>
+                <% } else if (l.status === 'wa_offline') { %><span class="cw-pill off">WA offline</span>
+                <% } else if (l.status === 'test') { %><span class="cw-pill off">test</span>
+                <% } else { %><span class="cw-pill bad"><%= l.status %></span><% } %>
+                <% if (l.note) { %><div class="cw-note"><%= l.note %></div><% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
+

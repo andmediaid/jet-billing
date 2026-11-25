@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="<%= (typeof lang !== 'undefined' && lang) ? lang : 'id' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WireGuard Tunnel | <%= company %></title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .wg-mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; word-break:break-all; }
+    .wg-box { background:rgba(15,23,42,.55); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+    .wg-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:800; }
+    .wg-pill.on { background:rgba(63,185,80,.16); color:#3fb950; }
+    .wg-pill.off { background:rgba(139,148,158,.16); color:var(--muted); }
+  </style>
+</head>
+<body>
+<%- include('partials/sidebar', { activePage: 'wireguard', company }) %>
+<div class="mw">
+  <div class="topbar">
+    <div class="tb-title">
+      <button class="hb-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <i class="bi bi-shield-shaded"></i> WireGuard Tunnel (MikroTik &harr; Billing)
+    </div>
+    <div class="tb-right">
+      <a href="/admin/api/wireguard/billing.conf" class="btn btn-g btn-sm" target="_blank"><i class="bi bi-file-earmark-code"></i> billing.conf</a>
+      <a href="/admin/logout" class="btn btn-g btn-sm"><i class="bi bi-box-arrow-left"></i></a>
+    </div>
+  </div>
+  <div class="page">
+
+    <% if (typeof msg !== 'undefined' && msg) { %>
+    <div class="alert alert-<%= msg.type === 'success' ? 's' : 'd' %>">
+      <i class="bi bi-<%= msg.type === 'success' ? 'check-circle' : 'exclamation-circle' %>"></i> <%= msg.text %>
+    </div>
+    <% } %>
+
+    <div class="alert alert-i">
+      <i class="bi bi-info-circle"></i>
+      WireGuard dipakai untuk <b>menghubungkan MikroTik tiap desa ke server billing</b> dan sebagai
+      <b>tunneling untuk meremot Web UI ONU pelanggan</b> dari jarak jauh (IP pelanggan/ONU dapat diakses lewat 10.66.66.x).
+      Buat <b>Peer</b> untuk tiap MikroTik, lalu salin <b>Script MikroTik</b> ke Terminal RouterOS v7.
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h6><i class="bi bi-hdd-stack"></i> Konfigurasi Server WireGuard (Billing)</h6></div>
+      <div class="card-bd">
+        <div class="wg-box" style="margin-bottom:12px">
+          <div class="cw-note">Public Key Server</div>
+          <div class="wg-mono" id="wg-server-pub"><%= status.serverPublicKey %></div>
+        </div>
+        <form method="POST" action="/admin/wireguard/server">
+          <div class="form-row" style="display:flex;gap:10px;flex-wrap:wrap">
+            <div class="fg" style="flex:1;min-width:180px"><label class="fl">Alamat Tunnel (server)</label><input class="fc" name="address" value="<%= status.address %>" placeholder="10.66.66.1/24"></div>
+            <div class="fg" style="flex:1;min-width:140px"><label class="fl">Listen Port</label><input class="fc" name="listen_port" type="number" value="<%= status.listenPort %>"></div>
+            <div class="fg" style="flex:1;min-width:200px"><label class="fl">Endpoint publik (host/IP billing)</label><input class="fc" name="endpoint" value="<%= status.endpoint %>" placeholder="mis. vpn.isp.net atau 103.x.x.x"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button class="btn btn-p btn-sm" type="submit"><i class="bi bi-save"></i> Simpan</button>
+            <button class="btn btn-d btn-sm" type="submit" name="regenerate" value="1" onclick="return confirm('Generate ulang kunci server? Semua peer MikroTik harus diperbarui lagi.')"><i class="bi bi-arrow-repeat"></i> Regenerate Kunci Server</button>
+          </div>
+        </form>
+        <div class="cw-note" style="margin-top:8px">Peers: <b><%= status.peerCount %></b> (aktif: <b><%= status.enabledPeers %></b>)</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h6><i class="bi bi-plus-circle"></i> Tambah Peer (MikroTik)</h6></div>
+      <div class="card-bd">
+        <form method="POST" action="/admin/wireguard/peers">
+          <div class="form-row" style="display:flex;gap:10px;flex-wrap:wrap">
+            <div class="fg" style="flex:1;min-width:160px"><label class="fl">Nama Peer *</label><input class="fc" name="name" required placeholder="mis. MikroTik Desa Sukamaju"></div>
+            <div class="fg" style="flex:1;min-width:160px"><label class="fl">Server / Router</label>
+              <select class="fs" name="router_id">
+                <option value="">(tidak terkait server)</option>
+                <% (routers || []).forEach((r) => { %><option value="<%= r.id %>"><%= r.name %><%= r.nama_desa ? ' - ' + r.nama_desa : '' %></option><% }) %>
+              </select>
+            </div>
+            <div class="fg" style="flex:1;min-width:140px"><label class="fl">Alamat Tunnel peer</label><input class="fc" name="address" placeholder="10.66.66.2/32"></div>
+            <div class="fg" style="flex:1;min-width:140px"><label class="fl">Listen Port peer</label><input class="fc" name="listen_port" type="number" value="51820"></div>
+          </div>
+          <div style="margin-top:8px"><button class="btn btn-p btn-sm" type="submit"><i class="bi bi-plus-lg"></i> Buat Peer</button></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hd"><h6><i class="bi bi-diagram-3"></i> Daftar Peer (<%= (peers||[]).length %>)</h6></div>
+      <div class="tbl-wrap">
+        <table class="dtbl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Nama</th>
+              <th>Router</th>
+              <th>Public Key</th>
+              <th>Address</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+          <% if (!peers || !peers.length) { %>
+            <tr><td colspan="7" class="text-center text-muted" style="padding:24px">Belum ada peer. Tambahkan peer untuk tiap MikroTik.</td></tr>
+          <% } %>
+          <% (peers || []).forEach((p, i) => { %>
+            <tr>
+              <td class="text-muted"><%= i + 1 %></td>
+              <td class="fw6"><%= p.name %><% if (p.note) { %><div class="cw-note"><%= p.note %></div><% } %></td>
+              <td><%= p.router_id || '-' %></td>
+              <td class="wg-mono" style="max-width:220px"><%= p.public_key %></td>
+              <td class="wg-mono"><%= p.address || '-' %></td>
+              <td><span class="wg-pill <%= p.enabled ? 'on' : 'off' %>"><%= p.enabled ? 'Aktif' : 'Nonaktif' %></span></td>
+              <td>
+                <button class="btn btn-p btn-icon btn-sm" title="Lihat Script MikroTik" onclick="showScript(<%= p.id %>)"><i class="bi bi-code-slash"></i></button>
+                <a class="btn btn-g btn-icon btn-sm" title="Download script" href="/admin/api/wireguard/peers/<%= p.id %>/script" target="_blank"><i class="bi bi-download"></i></a>
+                <form method="POST" action="/admin/wireguard/peers/<%= p.id %>/toggle" style="display:inline">
+                  <button class="btn btn-g btn-icon btn-sm" title="Aktif/Nonaktif"><i class="bi bi-toggle-<%= p.enabled ? 'on' : 'off' %>"></i></button>
+                </form>
+                <form method="POST" action="/admin/wireguard/peers/<%= p.id %>/delete" style="display:inline" onsubmit="return confirm('Hapus peer ini?')">
+                  <button class="btn btn-d btn-icon btn-sm" title="Hapus"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Script MikroTik -->
+<div class="mo" id="wgScriptModal">
+  <div class="mb" style="max-width:760px">
+    <div class="mh" style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <span class="mt"><i class="bi bi-code-slash"></i> Script MikroTik (RouterOS v7)</span>
+      <button class="mc" onclick="closeModal('wgScriptModal')">&times;</button>
+    </div>
+    <div class="mbody" style="padding:18px">
+      <pre id="wg-script-body" class="wg-mono wg-box" style="white-space:pre-wrap;max-height:60vh;overflow:auto"></pre>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-p btn-sm" onclick="copyScript()"><i class="bi bi-clipboard"></i> Copy</button>
+        <button class="btn btn-g btn-sm" onclick="closeModal('wgScriptModal')">Tutup</button>
+      </div>
+      <div class="cw-note" style="margin-top:8px">Tempel perintah ini di Terminal MikroTik. Pastikan port WireGuard (UDP) tidak diblokir firewall.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openModal(id){ var m=document.getElementById(id); if(m) m.classList.add('show'); }
+  function closeModal(id){ var m=document.getElementById(id); if(m) m.classList.remove('show'); }
+  function showScript(peerId){
+    var body = document.getElementById('wg-script-body');
+    body.textContent = 'Memuat...';
+    openModal('wgScriptModal');
+    fetch('/admin/api/wireguard/peers/' + peerId + '/script', { headers: { 'Accept': 'text/plain' } })
+      .then(function(r){ return r.text(); })
+      .then(function(t){ body.textContent = t; })
+      .catch(function(e){ body.textContent = 'Gagal: ' + e.message; });
+  }
+  function copyScript(){
+    var t = document.getElementById('wg-script-body').textContent;
+    navigator.clipboard.writeText(t).then(function(){ alert('Script disalin.'); }, function(){ alert('Gagal menyalin, salin manual.'); });
+  }
+  document.addEventListener('DOMContentLoaded', function(){
+    var m = document.getElementById('wgScriptModal');
+    if (m) m.addEventListener('click', function(e){ if (e.target === m) closeModal('wgScriptModal'); });
+  });
+</script>
+</body>
+</html>
+

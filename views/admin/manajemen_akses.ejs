@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="<%= lang || 'id' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Manajemen Akses | <%= company %></title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+<%- include('partials/sidebar', { activePage: 'manajemen_akses', company }) %>
+<div class="mw">
+  <div class="topbar">
+    <div class="tb-title">
+      <button class="hb-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <i class="bi bi-person-lock"></i> Manajemen Akses
+    </div>
+    <div class="tb-right">
+      <span class="adm-badge"><i class="bi bi-shield-lock"></i> Super Admin</span>
+      <a href="/admin/logout" class="btn btn-g btn-sm"><i class="bi bi-box-arrow-left"></i> Logout</a>
+    </div>
+  </div>
+
+  <div class="page">
+    <% if (msg) { %>
+      <div class="alert alert-<%= msg.type === 'success' ? 's' : 'd' %>">
+        <i class="bi bi-<%= msg.type === 'success' ? 'check-circle' : 'exclamation-circle' %>"></i>
+        <%= msg.text %>
+      </div>
+    <% } %>
+
+    <div style="display:grid;gap:16px">
+      <!-- Daftar Akun -->
+      <div class="card">
+        <div class="card-hd" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <h6 style="margin:0"><i class="bi bi-people"></i> Akun Pengelola Wilayah</h6>
+          <span class="badge" style="background:rgba(99,102,241,.18);color:#c7d2fe;padding:6px 10px;border-radius:999px">
+            <%= users.length %> akun
+          </span>
+        </div>
+        <div class="card-bd">
+          <% if (!users.length) { %>
+            <div class="alert alert-s" style="margin:0">Belum ada akun. Buat akun pertama di formulir di bawah.</div>
+          <% } else { %>
+            <div class="tbl-wrap">
+              <table class="dtbl">
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Username</th>
+                    <th>Peran</th>
+                    <th>Wilayah / Server</th>
+                    <th>Menu</th>
+                    <th>Status</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% users.forEach((u) => { %>
+                    <% const routerName = (routers.find(r => r.id === u.router_id) || {}).name || (u.router_id ? ('Server #' + u.router_id) : 'Semua / Global'); %>
+                    <tr>
+                      <td style="font-weight:700"><%= u.name %></td>
+                      <td class="mono"><%= u.username %></td>
+                      <td><%= roleLabels[u.role] || u.role %></td>
+                      <td><%= routerName %></td>
+                      <td><%= Object.keys(u.permissions || {}).length %> menu</td>
+                      <td>
+                        <% if (Number(u.is_active) === 1) { %>
+                          <span style="color:#4ade80;font-weight:700">Aktif</span>
+                        <% } else { %>
+                          <span style="color:#f87171;font-weight:700">Nonaktif</span>
+                        <% } %>
+                      </td>
+                      <td style="white-space:nowrap">
+                        <a href="/admin/manajemen-akses?edit=<%= u.id %>" class="btn btn-g btn-sm" title="Edit"><i class="bi bi-pencil"></i></a>
+                        <form method="POST" action="/admin/manajemen-akses/<%= u.id %>/toggle" style="display:inline">
+                          <button class="btn btn-g btn-sm" title="Aktif/Nonaktif"><i class="bi bi-toggle-<%= Number(u.is_active) === 1 ? 'on' : 'off' %>"></i></button>
+                        </form>
+                        <form method="POST" action="/admin/manajemen-akses/<%= u.id %>/delete" style="display:inline" onsubmit="return confirm('Hapus akun <%= u.username %>?');">
+                          <button class="btn btn-d btn-sm" title="Hapus"><i class="bi bi-trash"></i></button>
+                        </form>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div>
+
+      <!-- Form Buat / Edit -->
+      <div class="card">
+        <div class="card-hd">
+          <h6 style="margin:0">
+            <i class="bi bi-<%= editUser ? 'pencil-square' : 'plus-circle' %>"></i>
+            <%= editUser ? ('Edit Akun: ' + editUser.name) : 'Buat Akun Pengelola Wilayah Baru' %>
+          </h6>
+        </div>
+        <form method="POST" action="/admin/manajemen-akses/save">
+          <input type="hidden" name="id" value="<%= editUser ? editUser.id : '' %>">
+          <div class="card-bd" style="display:grid;gap:14px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
+              <div class="fg">
+                <label class="fl">Nama Lengkap</label>
+                <input class="fc" name="name" required value="<%= editUser ? editUser.name : '' %>" placeholder="Contoh: Budi - Pengelola Sepinggan">
+              </div>
+              <div class="fg">
+                <label class="fl">Username</label>
+                <input class="fc" name="username" required value="<%= editUser ? editUser.username : '' %>" placeholder="budi">
+              </div>
+              <div class="fg">
+                <label class="fl">Password <%= editUser ? '(kosongkan bila tidak diubah)' : '' %></label>
+                <input class="fc" type="text" name="password" <%= editUser ? '' : 'required' %> placeholder="••••••">
+              </div>
+              <div class="fg">
+                <label class="fl">Peran</label>
+                <select class="fc" name="role">
+                  <% Object.keys(roleLabels).forEach((rk) => { %>
+                    <option value="<%= rk %>" <%= editUser && editUser.role === rk ? 'selected' : '' %>><%= roleLabels[rk] %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="fg">
+                <label class="fl">Wilayah / Server (1 Server = 1 MikroTik = 1 Desa)</label>
+                <select class="fc" name="router_id">
+                  <option value="">— Semua / Global —</option>
+                  <% routers.forEach((r) => { %>
+                    <option value="<%= r.id %>" <%= editUser && Number(editUser.router_id) === r.id ? 'selected' : '' %>><%= r.name %></option>
+                  <% }) %>
+                </select>
+              </div>
+              <% if (editUser) { %>
+                <div class="fg">
+                  <label class="fl">Status Akun</label>
+                  <label style="display:flex;align-items:center;gap:10px;font-weight:700">
+                    <input type="checkbox" name="is_active" value="1" <%= Number(editUser.is_active) === 1 ? 'checked' : '' %>> Aktifkan akun
+                  </label>
+                </div>
+              <% } %>
+            </div>
+
+            <div class="card-hd" style="border-top:1px solid var(--border);padding-left:0;padding-right:0">
+              <h6 style="margin:0"><i class="bi bi-list-check"></i> Menu Sidebar yang Boleh Tampil & Hak Akses</h6>
+            </div>
+            <p class="hint" style="margin:0">Centang menu yang boleh dibuka akun ini. Untuk tiap menu, pilih aksi yang diizinkan (Lihat / Tambah / Ubah / Hapus).</p>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">
+              <% catalog.forEach((m) => {
+                   const perm = (editUser && editUser.permissions && Array.isArray(editUser.permissions[m.key])) ? editUser.permissions[m.key] : [];
+                   const enabled = !!perm.length;
+              %>
+                <div style="background:rgba(15,23,42,.55);border:1px solid var(--border);border-radius:14px;padding:12px">
+                  <label style="display:flex;align-items:center;gap:10px;font-weight:800;margin-bottom:8px">
+                    <input type="checkbox" name="enable_<%= m.key %>" value="1" onchange="toggleActions('<%= m.key %>', this.checked)" <%= enabled ? 'checked' : '' %>>
+                    <i class="<%= m.icon %>"></i> <%= m.label %>
+                  </label>
+                  <div id="actions-<%= m.key %>" style="display:<%= enabled ? 'flex' : 'none' %>;flex-wrap:wrap;gap:10px;padding-left:26px">
+                    <% m.actions.forEach((a) => { %>
+                      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#cbd5e1">
+                        <input type="checkbox" name="act_<%= m.key %>" value="<%= a %>" <%= perm.includes(a) ? 'checked' : '' %>>
+                        <%= actionLabels[a] || a %>
+                      </label>
+                    <% }) %>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+          <div class="card-bd" style="border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+            <% if (editUser) { %><a href="/admin/manajemen-akses" class="btn btn-g">Batal</a><% } %>
+            <button type="submit" class="btn btn-p"><i class="bi bi-save"></i> <%= editUser ? 'Simpan Perubahan' : 'Buat Akun' %></button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toggleActions(key, on) {
+    var el = document.getElementById('actions-' + key);
+    if (el) el.style.display = on ? 'flex' : 'none';
+  }
+</script>
+</body>
+</html>

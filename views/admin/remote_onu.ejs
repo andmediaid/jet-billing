@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="<%= (typeof lang !== 'undefined' && lang) ? lang : 'id' %>">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Remote Web UI ONU | <%= company %></title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="/admin/manifest.webmanifest">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <style>
+    .ronu-badge { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:700; }
+    .ronu-badge.online { background: rgba(63,185,80,.15); color:#3fb950; }
+    .ronu-badge.offline { background: rgba(248,81,73,.15); color:#f85149; }
+    .ronu-badge.unknown { background: rgba(139,148,158,.15); color:var(--muted); }
+    .ronu-url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; color:var(--primary); word-break:break-all; }
+    .ronu-nonu { color: var(--muted); font-size:12px; }
+    .ronu-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    #ronu-frame { width:100%; height:70vh; border:1px solid var(--border); border-radius:10px; background:#fff; }
+    .ronu-hint { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.5; }
+    @media (max-width:768px){
+      .stat-grid{ grid-template-columns:repeat(2,1fr) !important; }
+      .ronu-actions{ flex-direction:column; }
+    }
+  </style>
+</head>
+<body>
+<%- include('partials/sidebar', { activePage: 'remote_onu', company }) %>
+<div class="mw">
+  <div class="topbar">
+    <div class="tb-title">
+      <button class="hb-menu" onclick="toggleSidebar()"><i class="bi bi-list"></i></button>
+      <i class="bi bi-display"></i> Remote Web UI ONU
+    </div>
+    <div class="tb-right">
+      <span class="adm-badge"><i class="bi bi-person-fill"></i> <%= (typeof session !== 'undefined' && session && session.isCashier) ? t('admin.role.cashier', 'Kasir') : t('admin.role.admin', 'Admin') %></span>
+      <a href="/admin/logout" class="btn btn-g btn-sm"><i class="bi bi-box-arrow-left"></i></a>
+    </div>
+  </div>
+  <div class="page">
+
+    <% if (msg) { %>
+    <div class="alert alert-<%= msg.type === 'success' ? 's' : 'd' %>">
+      <i class="bi bi-<%= msg.type === 'success' ? 'check-circle' : 'exclamation-circle' %>"></i> <%= msg.text %>
+    </div>
+    <% } %>
+
+    <div class="alert alert-i">
+      <i class="bi bi-info-circle"></i>
+      Halaman ini menampilkan <b>Web UI bawaan modem/ONU</b> milik pelanggan (halaman login perangkat).
+      Data pelanggan &amp; perangkat diambil otomatis dari database.
+    </div>
+
+    <div class="stat-grid" style="grid-template-columns:repeat(4,1fr)">
+      <div class="sc i">
+        <i class="bi bi-people sc-icon"></i>
+        <div class="sc-label">Total Pelanggan</div>
+        <div class="sc-val" id="ronu-total"><%= (typeof stats !== 'undefined' && stats) ? stats.total : 0 %></div>
+      </div>
+      <div class="sc p">
+        <i class="bi bi-hdd-network sc-icon"></i>
+        <div class="sc-label">Punya ONU</div>
+        <div class="sc-val" id="ronu-withOnu"><%= (typeof stats !== 'undefined' && stats) ? stats.withOnu : 0 %></div>
+      </div>
+      <div class="sc s">
+        <i class="bi bi-wifi sc-icon"></i>
+        <div class="sc-label">ONU Online</div>
+        <div class="sc-val" id="ronu-online"><%= (typeof stats !== 'undefined' && stats) ? stats.online : 0 %></div>
+      </div>
+      <div class="sc d">
+        <i class="bi bi-wifi-off sc-icon"></i>
+        <div class="sc-label">ONU Offline</div>
+        <div class="sc-val" id="ronu-offline"><%= (typeof stats !== 'undefined' && stats) ? stats.offline : 0 %></div>
+      </div>
+    </div>
+
+
+    <div class="card">
+      <div class="card-hd">
+        <h6><i class="bi bi-display"></i> Daftar Pelanggan &amp; Web UI ONU</h6>
+        <button type="button" class="btn btn-g btn-sm" onclick="loadRemoteOnu()"><i class="bi bi-arrow-clockwise"></i> Muat Ulang</button>
+      </div>
+      <div class="card-bd" style="padding-bottom:0">
+        <form class="srow" onsubmit="return ronuSearch(event)">
+          <div class="sinput" style="max-width:360px">
+            <i class="bi bi-search"></i>
+            <input class="fc" id="ronu-search" name="q" placeholder="Cari nama, telepon, tag/SN ONU, PPPoE..." value="<%= search %>">
+          </div>
+          <button class="btn btn-g btn-sm" type="submit"><i class="bi bi-search"></i> Cari</button>
+          <button class="btn btn-g btn-sm" type="button" onclick="ronuReset()"><i class="bi bi-x"></i> Reset</button>
+        </form>
+      </div>
+      <div class="tbl-wrap">
+        <table class="dtbl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Pelanggan</th>
+              <th>Tag / SN ONU</th>
+              <th>Perangkat ONU</th>
+              <th>IP / Web UI</th>
+              <th>Status</th>
+              <th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="ronu-tbody">
+            <tr><td colspan="7" class="text-center text-muted" style="padding:32px"><i class="bi bi-arrow-repeat"></i> Memuat data...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Preview Web UI ONU -->
+<div class="mo" id="onuPreviewModal">
+  <div class="mb" style="max-width:1100px">
+    <div class="mhd" style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <h6 style="margin:0;font-size:14px;display:flex;align-items:center;gap:8px"><i class="bi bi-display"></i> Web UI ONU &mdash; <span id="onuPreviewName"></span></h6>
+      <button class="btn btn-g btn-sm" type="button" onclick="closeOnuPreview()"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="mbody">
+      <div class="ronu-actions" style="margin-bottom:10px">
+        <a id="onuPreviewLink" class="btn btn-p btn-sm" href="#" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Buka di Tab Baru</a>
+      </div>
+      <iframe id="ronu-frame" src="" referrerpolicy="no-referrer"></iframe>
+      <div class="ronu-hint">
+        <i class="bi bi-exclamation-triangle"></i>
+        Jika halaman kosong / blank, perangkat ONU biasanya memblokir tampilan di dalam frame (header <code>X-Frame-Options</code>) atau tidak terjangkau langsung dari jaringan Anda.
+        Gunakan tombol <b>Buka di Tab Baru</b>, atau pastikan jaringan Anda bisa mengakses IP ONU tersebut.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // API JSON sumber data (pelanggan + acs_devices)
+  var RONU_API = '<%= (typeof apiUrl !== "undefined" && apiUrl) ? apiUrl : "/api/admin/remote-onu" %>';
+
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c];
+    });
+  }
+  function openModal(id){ var m=document.getElementById(id); if(m) m.classList.add('show'); }
+  function closeModal(id){ var m=document.getElementById(id); if(m) m.classList.remove('show'); }
+  function previewOnuFromBtn(btn){
+    previewOnu(btn.getAttribute('data-name'), btn.getAttribute('data-url'));
+  }
+  function previewOnu(name, url){
+    document.getElementById('onuPreviewName').textContent = name || '';
+    document.getElementById('onuPreviewLink').href = url;
+    document.getElementById('ronu-frame').src = url;
+    openModal('onuPreviewModal');
+  }
+  function closeOnuPreview(){
+    document.getElementById('ronu-frame').src = 'about:blank';
+    closeModal('onuPreviewModal');
+  }
+
+  function renderStats(st){
+    if (!st) return;
+    var set = function(id, v){ var e = document.getElementById(id); if (e) e.textContent = v; };
+    set('ronu-total', st.total || 0);
+    set('ronu-withOnu', st.withOnu || 0);
+    set('ronu-online', st.online || 0);
+    set('ronu-offline', st.offline || 0);
+  }
+
+  function renderOnuTable(list){
+    var tb = document.getElementById('ronu-tbody');
+    if (!tb) return;
+    if (!list || !list.length){
+      tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:32px">Tidak ada pelanggan yang cocok.</td></tr>';
+      return;
+    }
+    var html = '';
+    list.forEach(function(c, i){
+      var onu = c.onu;
+      var tagHtml = c.genieacs_tag
+        ? '<div class="ronu-url"><i class="bi bi-upc-scan"></i> ' + esc(c.genieacs_tag) + '</div>'
+        : '<span class="ronu-nonu">-</span>';
+      if (c.pppoe_username) tagHtml += '<div class="ronu-nonu">PPPoE: ' + esc(c.pppoe_username) + '</div>';
+
+      var devHtml = onu
+        ? ('<div class="fw6">' + esc(onu.manufacturer || '-') + (onu.product_class ? ' (' + esc(onu.product_class) + ')' : '') + '</div>'
+           + '<div class="ronu-nonu">SN: ' + esc(onu.serial || c.genieacs_tag || '-') + '</div>')
+        : '<span class="ronu-nonu">Belum tertaut ke ACS</span>';
+
+      var ipHtml = (onu && onu.url)
+        ? ('<a class="ronu-url" href="' + esc(onu.url) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> ' + esc(onu.url) + '</a>')
+        : '<span class="ronu-nonu">IP tidak tersedia</span>';
+
+      var statusHtml = onu
+        ? ('<span class="ronu-badge ' + (onu.online ? 'online' : 'offline') + '"><i class="bi bi-' + (onu.online ? 'wifi' : 'wifi-off') + '"></i> ' + (onu.online ? 'Online' : 'Offline') + '</span>'
+           + (onu.last_inform ? '<div class="ronu-nonu" style="margin-top:4px">Inform: ' + esc(onu.last_inform) + '</div>' : ''))
+        : '<span class="ronu-badge unknown"><i class="bi bi-question-circle"></i> N/A</span>';
+
+      var actHtml = (onu && onu.url)
+        ? ('<a class="btn btn-p btn-sm" href="' + esc(onu.url) + '" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Buka Web UI</a>'
+           + '<button class="btn btn-g btn-sm" type="button" data-name="' + esc(c.name) + '" data-url="' + esc(onu.url) + '" onclick="previewOnuFromBtn(this)"><i class="bi bi-eye"></i> Preview</button>')
+        : '<span class="ronu-nonu">ONU tidak terdeteksi</span>';
+
+      html += '<tr>'
+        + '<td class="text-muted">' + (i + 1) + '</td>'
+        + '<td class="fw6"><div>' + esc(c.name) + '</div><div class="ronu-nonu"><i class="bi bi-telephone"></i> ' + esc(c.phone || '-')
+        + (c.package_name ? ' &bull; <i class="bi bi-box-seam"></i> ' + esc(c.package_name) : '') + '</div></td>'
+        + '<td>' + tagHtml + '</td>'
+        + '<td>' + devHtml + '</td>'
+        + '<td>' + ipHtml + '</td>'
+        + '<td>' + statusHtml + '</td>'
+        + '<td><div class="ronu-actions">' + actHtml + '</div></td>'
+        + '</tr>';
+    });
+    tb.innerHTML = html;
+  }
+
+  function loadRemoteOnu(q){
+    var tb = document.getElementById('ronu-tbody');
+    if (tb) tb.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:32px"><i class="bi bi-arrow-repeat"></i> Memuat data...</td></tr>';
+    var url = RONU_API + (q ? ('?q=' + encodeURIComponent(q)) : '');
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function(r){ if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(d){
+        if (!d || d.success === false) throw new Error((d && d.error && d.error.message) || 'Gagal memuat data');
+        renderStats(d.stats);
+        renderOnuTable(d.customers || []);
+      })
+      .catch(function(err){
+        if (tb) tb.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:32px;color:var(--danger)">Gagal memuat data: ' + esc(err.message) + '</td></tr>';
+      });
+  }
+
+  function ronuSearch(e){
+    if (e && e.preventDefault) e.preventDefault();
+    var el = document.getElementById('ronu-search');
+    loadRemoteOnu(el ? el.value : '');
+    return false;
+  }
+  function ronuReset(){
+    var el = document.getElementById('ronu-search');
+    if (el) el.value = '';
+    loadRemoteOnu('');
+    return false;
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    var modal = document.getElementById('onuPreviewModal');
+    if (modal) modal.addEventListener('click', function(e){ if (e.target === modal) closeOnuPreview(); });
+    var inp = document.getElementById('ronu-search');
+    loadRemoteOnu(inp ? inp.value : ''); // ambil data dari API /api/admin/remote-onu
+  });
+</script>
+</body>
+</html>
+
